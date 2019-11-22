@@ -30,50 +30,63 @@ namespace MNIST
             Number == 8 ? 1.0f : 0.0f,
             Number == 9 ? 1.0f : 0.0f,
         };
+        
     }
+
+
     class Program
     {
         // filenames for data set
         private static string trainDataPath = Path.Combine(Environment.CurrentDirectory, "mnist_train.csv");
         private static string testDataPath = Path.Combine(Environment.CurrentDirectory, "mnist_test.csv");
-        static void Main(string[] args) 
+    
+        public static Function BuildYoloDNN(int S=7,int B=2,int C=20,int H=416,int W=448) 
         {
-            // plot the error graph
-            var chart = Chart.Plot(
-                new[]
-                {
-                    new Graph.Scatter()
-                    {
-                        x = 0..100,
-                        y = 0..100,
-                        name = "training",
-                        mode = "lines+markers"
-                    },
-                    new Graph.Scatter()
-                    {
-                        x = 0..100,
-                        y = 0..100,
-                        name = "testing",
-                        mode = "lines+markers"
-                    }
-                });
-            chart.WithXTitle("Epoch");
-            chart.WithYTitle("Classification error");
-            chart.WithTitle("Digit Training");
+            //input
+            var features = Variable.InputVariable(new int[] { 3, H, W }, DataType.Float, "features");
+            var labels = Variable.InputVariable(new int[] { S,S,B*5+C }, DataType.Float, "labels");
 
-            // save chart
-            File.WriteAllText("chart.html", chart.GetHtml());
+            //buildNetwork alo LINQ
+            Func<Variable, Function> leakyRelu = (Variable v) => CNTKLib.LeakyReLU(v, 0.1);
+            var network = features.Convolution(new[] {7,7,64 },strides:new[] {2},activation: leakyRelu)
+                                  .Pooling(PoolingType.Max,new[] { 2,2},new[] {2})
+                                  .Convolution(new[] { 3,3,192}, activation: leakyRelu)
+                                  .Pooling(PoolingType.Max,new[] { 2,2},new[] {2})
+                                  .Convolution(new[] { 1, 1, 128 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 256 }, activation: leakyRelu)
+                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
+                                  .Pooling(PoolingType.Max, new[] { 2, 2 }, new[] { 2 })
+                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
+                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
+                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
+                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
+                                  .Convolution(new[] { 1, 1, 512 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
+                                  .Pooling(PoolingType.Max, new[] { 2, 2 }, new[] { 2 })
+                                  .Convolution(new[] { 1, 1, 512 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
+                                  .Convolution(new[] { 1, 1, 512 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 1024 },strides:new[] {2}, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
+                                  .Dense(new[] {4096}, activation: leakyRelu)
+                                  .Dense(new[] {S,S,B*5+C})
+                                  .ToNetwork();
+
+            return network;
         }
 
-        /// <summary>
-        /// The main program entry point.
-        /// </summary>
-        /// <param name="args">The command line arguments.</param>
-        static void Main2(string[] args)
+        static void Main(string[] args)
         {
             // create a machine learning context
             var context = new MLContext();
-
             // load data
             Console.WriteLine("Loading data....");
             var columnDef = new TextLoader.Column[]
@@ -102,22 +115,18 @@ namespace MNIST
             var training_labels = training.Select(v => v.GetLabel()).ToArray();
             var testing_data = testing.Select(v => v.GetFeatures()).ToArray();
             var testing_labels = testing.Select(v => v.GetLabel()).ToArray();
-
+           
             //input
-            var features = Variable.InputVariable(new int[] { 28, 28 }, DataType.Float, "features");
-            var labels = Variable.InputVariable(new int[] { 10 }, DataType.Float, "labels");
-
-            //buildNetwork alo LINQ
-            var network = features.Dense(512, CNTKLib.ReLU)
-                                  .Dense(10, CNTKLib.Softmax)
-                                  .ToNetwork();
+            var features = Variable.InputVariable(new int[] { }, DataType.Float, "features");
+            var labels = Variable.InputVariable(new int[] { }, DataType.Float, "labels");
+            var network = BuildYoloDNN(C:1);
 
             Console.WriteLine("Model architecture:");
             Console.WriteLine(network.ToSummary());
 
             // set up the loss function and the classification error function
-            var lossFunc = CNTKLib.CrossEntropyWithSoftmax(network.Output, labels);
-            var errorFunc = CNTKLib.ClassificationError(network.Output, labels);
+            var errorFunc = CNTKLib.SquaredError(network.Output, labels);
+            var lossFunc = CNTKLib.SquaredError(network.Output, labels);
 
             // set up a trainer that uses the RMSProp algorithm
             var learner = network.GetRMSPropLearner(
