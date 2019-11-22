@@ -17,6 +17,7 @@
   <ItemGroup>
     <PackageReference Include="CNTK.GPU" Version="2.7.0" />
     <PackageReference Include="Microsoft.ML" Version="1.4.0" />
+    <PackageReference Include="System.Drawing.Common" Version="4.5.1" />
     <PackageReference Include="XPlot.Plotly" Version="3.0.1" />
   </ItemGroup>
 
