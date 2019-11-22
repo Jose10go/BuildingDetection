@@ -56,36 +56,21 @@ namespace CNTKUtil
                 dynamicAxes: dynamicAxes);
         }
 
-        /// <summary>
-        /// Add a dense layer to a neural network.
-        /// </summary>
-        /// <param name="input">The neural network to expand.</param>
-        /// <param name="outputDim">The number of dimensions in the dense layer.</param>
-        /// <param name="activation">The activation function in the dense layer.</param>
-        /// <param name="outputName">The name of the layer.</param>
-        /// <returns>The neural network with the dense layer added.</returns>
         public static CNTK.Variable Dense(
             this CNTK.Variable input,
-            int outputDim,
+            int[] outputDim,
             Func<CNTK.Variable, CNTK.Function> activation,
             string outputName = "")
         {
-            return (CNTK.Variable)activation(Dense(input, outputDim, outputName));
+            return activation(Dense(input, outputDim, outputName));
         }
 
-        /// <summary>
-        /// Add a dense layer to a neural network.
-        /// </summary>
-        /// <param name="input">The neural network to expand.</param>
-        /// <param name="outputDim">The number of dimensions in the dense layer.</param>
-        /// <param name="outputName">The name of the layer.</param>
-        /// <returns>The neural network with the dense layer added.</returns>
         public static CNTK.Variable Dense(
             this CNTK.Variable input,
-            int outputDim,
+            int[] outputDim,
             string outputName = "")
         {
-            var shape = CNTK.NDShape.CreateNDShape(new int[] { outputDim, CNTK.NDShape.InferredDimension });
+            var shape = CNTK.NDShape.CreateNDShape(outputDim);
             var timesParam = new CNTK.Parameter(
                 shape, 
                 CNTK.DataType.Float, 
@@ -95,13 +80,13 @@ namespace CNTKUtil
                     CNTK.CNTKLib.SentinelValueForInferParamInitRank, 1), 
                 CurrentDevice, 
                 "timesParam_" + outputName);
+
             var timesFunction = CNTK.CNTKLib.Times(
                 timesParam, 
-                input, 
-                1 /* output dimension */, 
-                0 /* CNTK should infer the input dimensions */);
+                input);
+
             var plusParam = new CNTK.Parameter(
-                CNTK.NDShape.CreateNDShape(new int[] { CNTK.NDShape.InferredDimension }), 
+                CNTK.NDShape.CreateNDShape(new int[] { CNTK.NDShape.InferredDimension }),
                 0.0f, 
                 CurrentDevice, 
                 "plusParam_" + outputName);
@@ -109,55 +94,9 @@ namespace CNTKUtil
             return result;
         }
 
-        /// <summary>
-        /// Add a 1D convolution layer to a neural network.
-        /// </summary>
-        /// <param name="input">The neural network to expand.</param>
-        /// <param name="outputChannels">The number of output channels</param>
-        /// <param name="filterShape">The shape of the filter</param>
-        /// <param name="padding">Use padding or not?</param>
-        /// <param name="bias">Use bias or not?</param>
-        /// <param name="strides">The stride lengths</param>
-        /// <param name="activation">The activation function to use</param>
-        /// <param name="outputName">The name of the layer.</param>
-        /// <returns>The neural network with the convolution layer added.</returns>
-        public static CNTK.Variable Convolution1D(
+       
+        public static CNTK.Variable Convolution(
             this CNTK.Variable input,
-            int outputChannels,
-            int filterShape,
-            bool padding = false,
-            bool bias = true,
-            int[] strides = null,
-            Func<CNTK.Variable, CNTK.Function> activation = null,
-            string outputName = "")
-        {
-            var convolution_map_size = new int[] {
-                filterShape,
-                CNTK.NDShape.InferredDimension,
-                outputChannels
-            };
-            if (strides == null)
-            {
-                strides = new int[] { 1 };
-            }
-            return Convolution(convolution_map_size, input, padding, bias, strides, activation, outputName);
-        }
-
-        /// <summary>
-        /// Add a 2D convolution layer to a neural network.
-        /// </summary>
-        /// <param name="input">The neural network to expand.</param>
-        /// <param name="outputChannels">The number of output channels</param>
-        /// <param name="filterShape">The shape of the filter</param>
-        /// <param name="padding">Use padding or not?</param>
-        /// <param name="bias">Use bias or not?</param>
-        /// <param name="strides">The stride lengths</param>
-        /// <param name="activation">The activation function to use</param>
-        /// <param name="outputName">The name of the layer.</param>
-        /// <returns>The neural network with the convolution layer added.</returns>
-        public static CNTK.Variable Convolution2D(
-            this CNTK.Variable input,
-            int outputChannels,
             int[] filterShape,
             bool padding = false,
             bool bias = true,
@@ -165,35 +104,9 @@ namespace CNTKUtil
             Func<CNTK.Variable, CNTK.Function> activation = null,
             string outputName = "")
         {
-            var convolution_map_size = new int[] {
-                filterShape[0],
-                filterShape[1],
-                CNTK.NDShape.InferredDimension,
-                outputChannels
-            };
-            if (strides == null)
-            {
-                strides = new int[] { 1 };
-            }
-            return Convolution(convolution_map_size, input, padding, bias, strides, activation, outputName);
+            return Convolution(filterShape, input, padding, bias, strides, activation, outputName);
         }
 
-        /// <summary>
-        /// Add a convolution transpose layer to the network.
-        /// </summary>
-        /// <param name="input">The neural network to extend</param>
-        /// <param name="filterShape">The shape of the filters to use</param>
-        /// <param name="numberOfFilters">The number of filters to use</param>
-        /// <param name="activation">The activation function to use</param>
-        /// <param name="padding">Set to true to use padding</param>
-        /// <param name="strides">The stride lengths to use</param>
-        /// <param name="bias">Set to true to introduce bias</param>
-        /// <param name="outputShape">The output shape to generate</param>
-        /// <param name="reductionRank"></param>
-        /// <param name="dilation"></param>
-        /// <param name="maxTempMemSizeInSamples"></param>
-        /// <param name="name"></param>
-        /// <returns></returns>
         static public CNTK.Variable ConvolutionTranspose(
             this CNTK.Variable input,
             int[] filterShape,
@@ -256,13 +169,6 @@ namespace CNTKUtil
             return r;
         }
 
-        /// <summary>
-        /// Transpose two axes in the neural network.
-        /// </summary>
-        /// <param name="input">The neural network to transpose.</param>
-        /// <param name="axis1">The first axis to transpose.</param>
-        /// <param name="axis2">The second axis to transpose.</param>
-        /// <returns>The neural network with the axes transposed.</returns>
         public static CNTK.Variable TransposeAxes(
             this CNTK.Variable input,
             CNTK.Axis axis1,
@@ -271,14 +177,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.TransposeAxes(input, axis1, axis2);
         }
 
-        /// <summary>
-        /// Add a pooling layer to a neural network. 
-        /// </summary>
-        /// <param name="input">The neural network to expand</param>
-        /// <param name="poolingType">The type of pooling to perform</param>
-        /// <param name="windowShape">The shape of the pooling window</param>
-        /// <param name="strides">The stride lengths</param>
-        /// <returns>The neural network with the pooling layer added.</returns>
         public static CNTK.Variable Pooling(
             this CNTK.Variable input,
             CNTK.PoolingType poolingType,
@@ -288,14 +186,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.Pooling(input, poolingType, windowShape, strides);
         }
 
-        /// <summary>
-        /// Add a pooling layer to a neural network. 
-        /// </summary>
-        /// <param name="input">The neural network to expand</param>
-        /// <param name="poolingType">The type of pooling to perform</param>
-        /// <param name="windowShape">The shape of the pooling window</param>
-        /// <param name="strides">The stride lengths</param>
-        /// <returns>The neural network with the pooling layer added.</returns>
         public static CNTK.Variable Pooling(
             this CNTK.Variable input,
             CNTK.PoolingType poolingType,
@@ -305,12 +195,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.Pooling(input, poolingType, windowShape, strides);
         }
 
-        /// <summary>
-        /// Add a dropout layer to the neural network.
-        /// </summary>
-        /// <param name="input">The neural network to expand</param>
-        /// <param name="dropoutRate">The dropout rate to use</param>
-        /// <returns>The neural network with the dropout layer added</returns>
         public static CNTK.Variable Dropout(
             this CNTK.Variable input,
             double dropoutRate)
@@ -318,13 +202,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.Dropout(input, 0.5);
         }
 
-        /// <summary>
-        /// Add a one-hot encoder to the neural network.
-        /// </summary>
-        /// <param name="input">The neural network to expand</param>
-        /// <param name="numberOfClasses">The number of output classes to encode</param>
-        /// <param name="outputSparse">Indicates if the output is a sparse vector</param>
-        /// <returns>The neural network with the dropout layer added</returns>
         public static CNTK.Variable OneHotOp(
             this CNTK.Variable input,
             int numberOfClasses,
@@ -334,12 +211,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.OneHotOp(input, (uint)numberOfClasses, outputSparse, new CNTK.Axis(0));
         }
 
-        /// <summary>
-        /// Add an embedding layer to the neural network.
-        /// </summary>
-        /// <param name="input">The neural network to expand</param>
-        /// <param name="embeddingDimensions">The number of embedding dimensions to create</param>
-        /// <returns>The neural network with the dropout layer added</returns>
         public static CNTK.Variable Embedding(
             this CNTK.Variable input,
             int embeddingDimensions)
@@ -354,13 +225,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.Times(E, input);
         }
 
-        /// <summary>
-        /// Add an LSTM layer to the neural network.
-        /// </summary>
-        /// <param name="input">The neural network to expand</param>
-        /// <param name="lstmDimensions">The number of lstm dimensions to user</param>
-        /// <param name="cellDimensions">The number of cell dimensions to use</param>
-        /// <returns>The neural network with the dropout layer added</returns>
         public static CNTK.Variable LSTM(
             this CNTK.Variable input,
             int lstmDimensions,
@@ -369,13 +233,6 @@ namespace CNTKUtil
             return LSTMSequenceClassifier.LSTM(input, lstmDimensions, cellDimensions, NetUtil.CurrentDevice, "lstm");
         }
 
-        /// <summary>
-        /// Multiply all tensor elements in the network by the given scalar.
-        /// </summary>
-        /// <typeparam name="T">The type of the scalar to multiply by</typeparam>
-        /// <param name="input">The neural network</param>
-        /// <param name="scalar">The scalar to multiply by</param>
-        /// <returns>The neural network with the multiplication layer added</returns>
         public static CNTK.Variable MultiplyBy<T>(
             this CNTK.Variable input,
             T scalar)
@@ -384,12 +241,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.ElementTimes(scalarTensor, input);
         }
 
-        /// <summary>
-        /// Reshape the current network tensor to the new shape.
-        /// </summary>
-        /// <param name="input">The neural network</param>
-        /// <param name="newShape">The new shape to reshape the tensor to</param>
-        /// <returns>The neural network with the reshape layer added</returns>
         public static CNTK.Variable Reshape(
             this CNTK.Variable input,
             CNTK.NDShape newShape)
@@ -397,12 +248,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.Reshape(input, newShape);
         }
 
-        /// <summary>
-        /// Add the VGG16 convolutional base to the network.
-        /// </summary>
-        /// <param name="input">The neural network</param>
-        /// <param name="allowBlock5Finetuning">Indicates if block5 finetuning is allowed</param>
-        /// <returns>The neural network with the VGG16 convolutional base added</returns>
         public static CNTK.Variable VGG16(
             this CNTK.Variable input, 
             bool allowBlock5Finetuning)
@@ -410,12 +255,6 @@ namespace CNTKUtil
             return DataUtil.VGG16.GetModel(input, allowBlock5Finetuning);
         }
 
-        /// <summary>
-        /// Add the VGG19 convolutional base to the network.
-        /// </summary>
-        /// <param name="input">The neural network</param>
-        /// <param name="freeze">Set to true to freeze all weights in the network.</param>
-        /// <returns>The neural network with the VGG16 convolutional base added</returns>
         public static CNTK.Variable VGG19(
             this CNTK.Variable input,
             bool freeze)
@@ -423,22 +262,12 @@ namespace CNTKUtil
             return DataUtil.VGG19.GetModel(input, freeze);
         }
 
-        /// <summary>
-        /// Cast a network layer to a Function.
-        /// </summary>
-        /// <param name="input">The neural network to expand.</param>
-        /// <returns>The neural network layer cast to a Function instance.</returns>
         public static CNTK.Function ToNetwork(
             this CNTK.Variable input)
         {
-            return (CNTK.Function)input;
+            return input;
         }
 
-        /// <summary>
-        /// Return a summary description of the neural network.
-        /// </summary>
-        /// <param name="model">The neural network to describe</param>
-        /// <returns>A string description of the neural network</returns>
         public static string ToSummary(this CNTK.Function model)
         {
             var sb = new StringBuilder();
