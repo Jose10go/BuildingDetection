@@ -3,6 +3,7 @@ using CNTKUtil;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 using System;
+using System.Collections;
 using System.IO;
 using System.Linq;
 using XPlot.Plotly;
@@ -119,36 +120,24 @@ namespace MNIST
             //input
             var features = Variable.InputVariable(new int[] { }, DataType.Float, "features");
             var labels = Variable.InputVariable(new int[] { }, DataType.Float, "labels");
+
             var network = BuildYoloDNN(C:1);
 
             Console.WriteLine("Model architecture:");
             Console.WriteLine(network.ToSummary());
 
-            // set up the loss function and the classification error function
+            // set up the loss function and the error function
             var errorFunc = CNTKLib.SquaredError(network.Output, labels);
             var lossFunc = CNTKLib.SquaredError(network.Output, labels);
-
-            // set up a trainer that uses the RMSProp algorithm
-            var learner = network.GetRMSPropLearner(
-                learningRateSchedule: 0.99,
-                gamma: 0.95,
-                inc: 2.0,
-                dec: 0.5,
-                max: 2.0,
-                min: 0.5
-            );
-
-            // set up a trainer and an evaluator
-            var trainer = network.GetTrainer(learner, lossFunc, errorFunc);
-            var evaluator = network.GetEvaluator(errorFunc);
+            
+            var maxEpochs = 135;
+            var batchSize = 64;
 
             // train the model
             Console.WriteLine("Epoch\tTrain\tTrain\tTest");
             Console.WriteLine("\tLoss\tError\tError");
             Console.WriteLine("-----------------------------");
 
-            var maxEpochs = 50;
-            var batchSize = 128;
             var loss = new double[maxEpochs];
             var trainingError = new double[maxEpochs];
             var testingError = new double[maxEpochs];
@@ -166,6 +155,12 @@ namespace MNIST
                     var featureBatch = features.GetBatch(training_data, indices, begin, end);
                     var labelBatch = labels.GetBatch(training_labels, indices, begin, end);
 
+                    var learner=CNTKLib.MomentumSGDLearner(
+                    new ParameterVector((ICollection)network.Parameters()),
+                    new TrainingParameterScheduleDouble(GetLearningRate(epoch)),
+                    new TrainingParameterScheduleDouble(0.9));
+
+                    var trainer = network.GetTrainer(learner, lossFunc, errorFunc);
                     // train the network on the batch
                     var result = trainer.TrainBatch(
                                         new[] {
@@ -193,6 +188,7 @@ namespace MNIST
                     var featureBatch = features.GetBatch(testing_data, begin, end);
                     var labelBatch = labels.GetBatch(testing_labels, begin, end);
 
+                    var evaluator = network.GetEvaluator(errorFunc);
                     // test the network on the batch
                     testingError[epoch] += evaluator.TestBatch(
                         new[] {
@@ -237,6 +233,15 @@ namespace MNIST
 
             // save chart
             File.WriteAllText("chart.html", chart.GetHtml());
+        }
+
+        private static double GetLearningRate(int epoch)
+        {
+            if (epoch < 75)
+                return 1e2;
+            if (epoch < 105)
+                return 1e3;
+            return 1e4;
         }
     }
 }
