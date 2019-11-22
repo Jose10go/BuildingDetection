@@ -2,57 +2,30 @@
 using CNTKUtil;
 using Microsoft.ML;
 using Microsoft.ML.Data;
+using MNIST.Utils;
 using System;
 using System.Collections;
 using System.IO;
 using System.Linq;
 using XPlot.Plotly;
+
 namespace MNIST
 {
-    class Digit
-    {
-        [VectorType(784)]
-        public float[] PixelValues = default;
-
-        [LoadColumn(0)]
-        public float Number = default;
-
-        public float[] GetFeatures() => PixelValues;
-
-        public float[] GetLabel() => new float[] {
-            Number == 0 ? 1.0f : 0.0f,
-            Number == 1 ? 1.0f : 0.0f,
-            Number == 2 ? 1.0f : 0.0f,
-            Number == 3 ? 1.0f : 0.0f,
-            Number == 4 ? 1.0f : 0.0f,
-            Number == 5 ? 1.0f : 0.0f,
-            Number == 6 ? 1.0f : 0.0f,
-            Number == 7 ? 1.0f : 0.0f,
-            Number == 8 ? 1.0f : 0.0f,
-            Number == 9 ? 1.0f : 0.0f,
-        };
-        
-    }
-
-
     class Program
     {
-        // filenames for data set
-        private static string trainDataPath = Path.Combine(Environment.CurrentDirectory, "mnist_train.csv");
-        private static string testDataPath = Path.Combine(Environment.CurrentDirectory, "mnist_test.csv");
-    
-        public static Function BuildYoloDNN(int S=7,int B=2,int C=20,int H=416,int W=448) 
+
+        public static Function BuildYoloDNN(int S = 7, int B = 2, int C = 20, int H = 416, int W = 448)
         {
             //input
             var features = Variable.InputVariable(new int[] { 3, H, W }, DataType.Float, "features");
-            var labels = Variable.InputVariable(new int[] { S,S,B*5+C }, DataType.Float, "labels");
+            var labels = Variable.InputVariable(new int[] { S, S, B * 5 + C }, DataType.Float, "labels");
 
             //buildNetwork alo LINQ
             Func<Variable, Function> leakyRelu = (Variable v) => CNTKLib.LeakyReLU(v, 0.1);
-            var network = features.Convolution(new[] {7,7,64 },strides:new[] {2},activation: leakyRelu)
-                                  .Pooling(PoolingType.Max,new[] { 2,2},new[] {2})
-                                  .Convolution(new[] { 3,3,192}, activation: leakyRelu)
-                                  .Pooling(PoolingType.Max,new[] { 2,2},new[] {2})
+            var network = features.Convolution(new[] { 7, 7, 64 }, strides: new[] { 2 }, activation: leakyRelu)
+                                  .Pooling(PoolingType.Max, new[] { 2, 2 }, new[] { 2 })
+                                  .Convolution(new[] { 3, 3, 192 }, activation: leakyRelu)
+                                  .Pooling(PoolingType.Max, new[] { 2, 2 }, new[] { 2 })
                                   .Convolution(new[] { 1, 1, 128 }, activation: leakyRelu)
                                   .Convolution(new[] { 3, 3, 256 }, activation: leakyRelu)
                                   .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
@@ -74,11 +47,11 @@ namespace MNIST
                                   .Convolution(new[] { 1, 1, 512 }, activation: leakyRelu)
                                   .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
                                   .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 1024 },strides:new[] {2}, activation: leakyRelu)
+                                  .Convolution(new[] { 3, 3, 1024 }, strides: new[] { 2 }, activation: leakyRelu)
                                   .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
                                   .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
-                                  .Dense(new[] {4096}, activation: leakyRelu)
-                                  .Dense(new[] {S,S,B*5+C})
+                                  .Dense(new[] { 4096 }, activation: leakyRelu)
+                                  .Dense(new[] { S, S, B * 5 + C })
                                   .ToNetwork();
 
             return network;
@@ -90,38 +63,26 @@ namespace MNIST
             var context = new MLContext();
             // load data
             Console.WriteLine("Loading data....");
-            var columnDef = new TextLoader.Column[]
-            {
-                new TextLoader.Column(nameof(Digit.PixelValues), DataKind.Single, 1, 784),
-                new TextLoader.Column(nameof(Digit.Number), DataKind.Single, 0)
-            };
 
-            var trainDataView = context.Data.LoadFromTextFile(
-                path: trainDataPath,
-                columns: columnDef,
-                hasHeader: true,
-                separatorChar: ',');
-            var testDataView = context.Data.LoadFromTextFile(
-                path: testDataPath,
-                columns: columnDef,
-                hasHeader: true,
-                separatorChar: ',');
+            var l = ReadAnnotationImages.ReadFromDirectory("D:\\Users\\JYS\\Desktop\\dataset", 448, 448);
+            var training = l.Take(4 * l.Count / 5);
+            var testing = l.Skip(4 * l.Count / 5);
 
             //// load training and testing data
-            var training = context.Data.CreateEnumerable<Digit>(trainDataView, reuseRowObject: false);
-            var testing = context.Data.CreateEnumerable<Digit>(testDataView, reuseRowObject: false);
+            //var training = context.Data.CreateEnumerable<Digit>(trainDataView, reuseRowObject: false);
+            //var testing = context.Data.CreateEnumerable<Digit>(testDataView, reuseRowObject: false);
 
             // set up data arrays
-            var training_data = training.Select(v => v.GetFeatures()).ToArray();
-            var training_labels = training.Select(v => v.GetLabel()).ToArray();
-            var testing_data = testing.Select(v => v.GetFeatures()).ToArray();
-            var testing_labels = testing.Select(v => v.GetLabel()).ToArray();
-           
+            var training_data = training.Select(v => v.Image.ExtractCHW()).ToArray();
+            var training_labels = training.Select(v => 0f).ToArray();
+            var testing_data = testing.Select(v => v.Image.ExtractCHW()).ToArray();
+            var testing_labels = testing.Select(v => 0f).ToArray();
+
             //input
             var features = Variable.InputVariable(new int[] { }, DataType.Float, "features");
             var labels = Variable.InputVariable(new int[] { }, DataType.Float, "labels");
 
-            var network = BuildYoloDNN(C:1);
+            var network = BuildYoloDNN(C: 1);
 
             Console.WriteLine("Model architecture:");
             Console.WriteLine(network.ToSummary());
@@ -129,7 +90,7 @@ namespace MNIST
             // set up the loss function and the error function
             var errorFunc = CNTKLib.SquaredError(network.Output, labels);
             var lossFunc = CNTKLib.SquaredError(network.Output, labels);
-            
+
             var maxEpochs = 135;
             var batchSize = 64;
 
@@ -155,7 +116,7 @@ namespace MNIST
                     var featureBatch = features.GetBatch(training_data, indices, begin, end);
                     var labelBatch = labels.GetBatch(training_labels, indices, begin, end);
 
-                    var learner=CNTKLib.MomentumSGDLearner(
+                    var learner = CNTKLib.MomentumSGDLearner(
                     new ParameterVector((ICollection)network.Parameters()),
                     new TrainingParameterScheduleDouble(GetLearningRate(epoch)),
                     new TrainingParameterScheduleDouble(0.9));

@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System.Collections.Generic;
+using System.Drawing;
 using System.Drawing.Imaging;
 
 namespace MNIST.Utils
@@ -44,6 +45,31 @@ namespace MNIST.Utils
             }
 
             return newImg;
+        }
+
+        /// <summary>
+        /// Extracts image pixels in CHW
+        /// </summary>
+        /// <param name="image">The bitmap image to extract features from</param>
+        /// <returns>A list of pixels in HWC order</returns>
+        public static float[] ExtractCHW(this Bitmap image)
+        {
+            var features = new List<float>(image.Width * image.Height * 3);
+            for (int c = 0; c < 3; c++)
+            {
+                for (int h = 0; h < image.Height; h++)
+                {
+                    for (int w = 0; w < image.Width; w++)
+                    {
+                        var pixel = image.GetPixel(w, h);
+                        float v = c == 0 ? pixel.B : c == 1 ? pixel.G : pixel.R;
+
+                        features.Add(v);
+                    }
+                }
+            }
+
+            return features.ToArray();
         }
     }
 }
