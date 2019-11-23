@@ -128,10 +128,12 @@ namespace CNTKUtil
             var result = new CNTK.NDArrayView[num_indices];
 
             var row_index = 0;
+            var temp = new List<float[]>();
             for (var index = begin; index != end; index++)
             {
                 var dataBuffer = source[indices[index]];
-                var ndArrayView = new CNTK.NDArrayView(variable.Shape, dataBuffer.Features, CNTK.DeviceDescriptor.CPUDevice, true);
+                temp.Add(dataBuffer.Features);
+                var ndArrayView = new CNTK.NDArrayView(variable.Shape, temp.Last(), CNTK.DeviceDescriptor.CPUDevice, true);
                 result[row_index++] = ndArrayView;
             }
 
