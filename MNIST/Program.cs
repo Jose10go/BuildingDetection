@@ -73,9 +73,9 @@ namespace MNIST
             //var testing = context.Data.CreateEnumerable<Digit>(testDataView, reuseRowObject: false);
 
             // set up data arrays
-            var training_data = training.Select(v => v.Image.ExtractCHW()).ToArray();
+            var training_data = training.Select(v => v.ImageCHW).ToArray();
             var training_labels = training.Select(v => v.ToOutput(C:1)).ToArray();
-            var testing_data = testing.Select(v => v.Image.ExtractCHW()).ToArray();
+            var testing_data = testing.Select(v => v.ImageCHW).ToArray();
             var testing_labels = testing.Select(v => v.ToOutput(C:1)).ToArray();
 
             var (network, features, labels) = BuildYoloDNN(C: 1);
