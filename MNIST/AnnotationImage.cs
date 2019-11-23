@@ -1,4 +1,5 @@
-﻿using MNIST.Utils;
+﻿using CNTKUtil;
+using MNIST.Utils;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -6,17 +7,16 @@ using System.IO;
 
 namespace MNIST
 {
-    public class AnnotationImage
+    public class AnnotationImage:IData
     {
         public AnnotationImage()
         {
             Object = new List<AnnotationObject>();
         }
-        private Bitmap Image { get =>
-            new Bitmap(Bitmap.FromFile(FileName)).Resize(Width, Height);
-        }
+        private Bitmap Image => new Bitmap(Bitmap.FromFile(FileName)).Resize(Width, Height);
 
-        public float[] ImageCHW { get => Image.ExtractCHW(); }
+        public float[] Features => Image.ExtractCHW();
+        public float[] Labels => ToOutput(C: 1); 
 
         public int Width { get; private set; }
         public int Height { get; private set; }
@@ -49,7 +49,7 @@ namespace MNIST
             return result;
         }
 
-        public float[] ToOutput(int S = 7, int B = 2, int C = 20, int H = 448, int W = 448) 
+        private float[] ToOutput(int S = 7, int B = 2, int C = 20, int H = 448, int W = 448) 
         {
             //TODO: Improve THIS
             var result = new float[S*S*(B * 5 + C)];

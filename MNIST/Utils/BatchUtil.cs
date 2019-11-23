@@ -15,13 +15,11 @@ namespace CNTKUtil
         /// </summary>
         /// <param name="data">The data array to use.</param>
         /// <returns>An array instance with the numbers 0..N, with N the size of the data array.</returns>
-        public static int[] Index(this float[][] data)
+        public static int[] Index<T>(this T[] data)
         {
             var array = new int[data.Length];
             for (int i = 0; i < data.Length; i++)
-            {
                 array[i] = i;
-            }
             return array;
         }
 
@@ -73,7 +71,6 @@ namespace CNTKUtil
                 var end = Math.Min(begin + batchSize, indices.Length);
                 action(indices, begin, end);
                 begin = end;
-
             }
         }
 
@@ -83,10 +80,10 @@ namespace CNTKUtil
         /// <param name="data">The data array to use.</param>
         /// <param name="batchSize">The size of each batch.</param>
         /// <param name="action">The action to perform on each batch.</param>
-        public static void Batch(
-            this float[][] data,
+        public static void Batch<T>(
+            this T[] data,
             int batchSize,
-            Action<float[][], int, int> action)
+            Action<T[], int, int> action) where T:IData
         {
             var begin = 0;
             while (begin < data.Length)
@@ -94,7 +91,6 @@ namespace CNTKUtil
                 var end = Math.Min(begin + batchSize, data.Length);
                 action(data, begin, end);
                 begin = end;
-
             }
         }
 
@@ -119,22 +115,13 @@ namespace CNTKUtil
                 action(i, trainingIndices, validationIndices);
             }
         }
-
-        /// <summary>
-        /// Get a batch from the given variable.
-        /// </summary>
-        /// <param name="variable">The variable to use.</param>
-        /// <param name="source">The variable data.</param>
-        /// <param name="indices">The array of data indices to use.</param>
-        /// <param name="begin">The first index to use.</param>
-        /// <param name="end">The last index to use.</param>
-        /// <returns>A batch of values taken from the given variable.</returns>
-        public static CNTK.Value GetBatch(
+        
+        public static CNTK.Value GetFeaturesBatch<T>(
             this CNTK.Variable variable,
-            float[][] source,
+            T[] source,
             int[] indices,
             int begin,
-            int end)
+            int end) where T:IData
         {
             var num_indices = end - begin;
             var row_length = variable.Shape.TotalSize;
@@ -144,7 +131,29 @@ namespace CNTKUtil
             for (var index = begin; index != end; index++)
             {
                 var dataBuffer = source[indices[index]];
-                var ndArrayView = new CNTK.NDArrayView(variable.Shape, dataBuffer, CNTK.DeviceDescriptor.CPUDevice, true);
+                var ndArrayView = new CNTK.NDArrayView(variable.Shape, dataBuffer.Features, CNTK.DeviceDescriptor.CPUDevice, true);
+                result[row_index++] = ndArrayView;
+            }
+
+            return CNTK.Value.Create(variable.Shape, result, NetUtil.CurrentDevice, true);
+        }
+
+        public static CNTK.Value GetLabelsBatch<T>(
+            this CNTK.Variable variable,
+            T[] source,
+            int[] indices,
+            int begin,
+            int end) where T : IData
+        {
+            var num_indices = end - begin;
+            var row_length = variable.Shape.TotalSize;
+            var result = new CNTK.NDArrayView[num_indices];
+
+            var row_index = 0;
+            for (var index = begin; index != end; index++)
+            {
+                var dataBuffer = source[indices[index]];
+                var ndArrayView = new CNTK.NDArrayView(variable.Shape, dataBuffer.Labels, CNTK.DeviceDescriptor.CPUDevice, true);
                 result[row_index++] = ndArrayView;
             }
             return CNTK.Value.Create(variable.Shape, result, NetUtil.CurrentDevice, true);
@@ -177,19 +186,11 @@ namespace CNTKUtil
             return CNTK.Value.CreateBatch(variable.Shape, result, NetUtil.CurrentDevice, true);
         }
 
-        /// <summary>
-        /// Get a batch from the given variable.
-        /// </summary>
-        /// <param name="variable">The variable to use.</param>
-        /// <param name="source">The variable data.</param>
-        /// <param name="begin">The index of the first value to use.</param>
-        /// <param name="end">The index of the last value to use.</param>
-        /// <returns>A batch of values taken from the given variable.</returns>
-        public static CNTK.Value GetBatch(
+        public static CNTK.Value GetLabelsBatch<T>(
             this CNTK.Variable variable,
-            float[][] source,
+            T[] source,
             int begin,
-            int end)
+            int end)where T:IData
         {
             var num_indices = end - begin;
             var result = new CNTK.NDArrayView[num_indices];
@@ -197,20 +198,30 @@ namespace CNTKUtil
             for (var index = begin; index != end; index++)
             {
                 var dataBuffer = source[index];
-                var ndArrayView = new CNTK.NDArrayView(variable.Shape, dataBuffer, CNTK.DeviceDescriptor.CPUDevice, true);
+                var ndArrayView = new CNTK.NDArrayView(variable.Shape, dataBuffer.Labels, CNTK.DeviceDescriptor.CPUDevice, true);
                 result[row_index++] = ndArrayView;
             }
             return CNTK.Value.Create(variable.Shape, result, NetUtil.CurrentDevice, true);
         }
 
-        /// <summary>
-        /// Get a batch from the given variable.
-        /// </summary>
-        /// <param name="variable">The variable to use.</param>
-        /// <param name="source">The variable data.</param>
-        /// <param name="begin">The index of the first value to use.</param>
-        /// <param name="end">The index of the last value to use.</param>
-        /// <returns>A batch of values taken from the given variable.</returns>
+        public static CNTK.Value GetFeaturesBatch<T>(
+            this CNTK.Variable variable,
+            T[] source,
+            int begin,
+            int end) where T : IData
+        {
+            var num_indices = end - begin;
+            var result = new CNTK.NDArrayView[num_indices];
+            var row_index = 0;
+            for (var index = begin; index != end; index++)
+            {
+                var dataBuffer = source[index];
+                var ndArrayView = new CNTK.NDArrayView(variable.Shape, dataBuffer.Features, CNTK.DeviceDescriptor.CPUDevice, true);
+                result[row_index++] = ndArrayView;
+            }
+            return CNTK.Value.Create(variable.Shape, result, NetUtil.CurrentDevice, true);
+        }
+
         public static CNTK.Value GetBatch(
             this CNTK.Variable variable,
             float[] source,

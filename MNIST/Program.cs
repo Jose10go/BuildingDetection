@@ -65,18 +65,17 @@ namespace MNIST
             Console.WriteLine("Loading data....");
 
             var l = ReadAnnotationImages.ReadFromDirectory(@"C:\Users\Jose10go\Downloads\dataset", 448, 448);
-            var training = l.Take(4 * l.Count / 5);
-            var testing = l.Skip(4 * l.Count / 5);
-
+            var training = l.Take(4 * l.Count / 5).ToArray();
+            var testing = l.Skip(4 * l.Count / 5).ToArray();
             //// load training and testing data
             //var training = context.Data.CreateEnumerable<Digit>(trainDataView, reuseRowObject: false);
             //var testing = context.Data.CreateEnumerable<Digit>(testDataView, reuseRowObject: false);
 
             // set up data arrays
-            var training_data = training.Select(v => v.ImageCHW).ToArray();
-            var training_labels = training.Select(v => v.ToOutput(C:1)).ToArray();
-            var testing_data = testing.Select(v => v.ImageCHW).ToArray();
-            var testing_labels = testing.Select(v => v.ToOutput(C:1)).ToArray();
+            //var training_data = training.Select(v => v.Image.ExtractCHW()).ToArray();
+            //var training_labels = training.Select(v => v.ToOutput(C:1)).ToArray();
+            //var testing_data = testing.Select(v => v.Image.ExtractCHW()).ToArray();
+            //var testing_labels = testing.Select(v => v.ToOutput(C:1)).ToArray();
 
             var (network, features, labels) = BuildYoloDNN(C: 1);
 
@@ -87,8 +86,8 @@ namespace MNIST
             var errorFunc = CNTKLib.SquaredError(network.Output, labels);
             var lossFunc = CNTKLib.SquaredError(network.Output, labels);
 
-            var maxEpochs = 135;
-            var batchSize = 64;
+            var maxEpochs = 10;//135;
+            var batchSize = 32;//64;
 
             // train the model
             Console.WriteLine("Epoch\tTrain\tTrain\tTest");
@@ -104,17 +103,17 @@ namespace MNIST
             {
                 var learner = CNTKLib.MomentumSGDLearner(
                 new ParameterVector((ICollection)network.Parameters()),
-                new TrainingParameterScheduleDouble(GetLearningRate(epoch)),
+                new TrainingParameterScheduleDouble(GetLearningRate(epoch,maxEpochs)),
                 new TrainingParameterScheduleDouble(0.9));
                 // train one epoch on batches
                 loss[epoch] = 0.0;
                 trainingError[epoch] = 0.0;
                 batchCount = 0;
-                training_data.Index().Shuffle().Batch(batchSize, (indices, begin, end) =>
+                training.Index().Shuffle().Batch(batchSize, (indices, begin, end) =>
                 {
                     // get the current batch
-                    var featureBatch = features.GetBatch(training_data, indices, begin, end);
-                    var labelBatch = labels.GetBatch(training_labels, indices, begin, end);
+                    var featureBatch = features.GetFeaturesBatch(training, indices, begin, end);
+                    var labelBatch = labels.GetLabelsBatch(training, indices, begin, end);
 
                     var trainer = network.GetTrainer(learner, lossFunc, errorFunc);
                     // train the network on the batch
@@ -138,11 +137,11 @@ namespace MNIST
                 // test one epoch on batches
                 testingError[epoch] = 0.0;
                 batchCount = 0;
-                testing_data.Batch(batchSize, (data, begin, end) =>
+                testing.Batch(batchSize, (data, begin, end) =>
                 {
                     // get the current batch for testing
-                    var featureBatch = features.GetBatch(testing_data, begin, end);
-                    var labelBatch = labels.GetBatch(testing_labels, begin, end);
+                    var featureBatch = features.GetFeaturesBatch(testing, begin, end);
+                    var labelBatch = labels.GetLabelsBatch(testing, begin, end);
 
                     var evaluator = network.GetEvaluator(errorFunc);
                     // test the network on the batch
@@ -167,11 +166,11 @@ namespace MNIST
             network.Save("MODEL.MODEL");
         }
 
-        private static double GetLearningRate(int epoch)
+        private static double GetLearningRate(int epoch,int maxEpochs)
         {
-            if (epoch < 75)
+            if (epoch < 55*maxEpochs/100)
                 return 1e2;
-            if (epoch < 105)
+            if (epoch < 77 * maxEpochs / 100)
                 return 1e3;
             return 1e4;
         }
