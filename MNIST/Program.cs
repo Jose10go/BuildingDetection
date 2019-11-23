@@ -13,11 +13,11 @@ namespace MNIST
 {
     class Program
     {
-        public static Function BuildYoloDNN(int S=7,int B=2,int C=20,int H=448,int W=448) 
+        public static (Function,Variable,Variable) BuildYoloDNN(int S=7,int B=2,int C=20,int H=448,int W=448) 
         {
             //input
             var features = Variable.InputVariable(new int[] { H, W, 3 }, DataType.Float, "features");
-            //var labels = Variable.InputVariable(new int[] { S,S,B*5+C }, DataType.Float, "labels");
+            var labels = Variable.InputVariable(new int[] { S,S,B*5+C }, DataType.Float, "labels");
 
             //buildNetwork alo LINQ
             Func<Variable, Function> leakyRelu = (Variable v) => CNTKLib.LeakyReLU(v, 0.1);
@@ -54,7 +54,7 @@ namespace MNIST
                                   .Dense(new[] {S,S,B*5+C})
                                   .ToNetwork();
 
-            return network;
+            return (network,features,labels);
         }
        
         static void Main(string[] args)
@@ -64,7 +64,7 @@ namespace MNIST
             // load data
             Console.WriteLine("Loading data....");
 
-            var l = ReadAnnotationImages.ReadFromDirectory("D:\\Users\\JYS\\Desktop\\dataset", 448, 448);
+            var l = ReadAnnotationImages.ReadFromDirectory(@"C:\Users\Jose10go\Downloads\dataset", 448, 448);
             var training = l.Take(4 * l.Count / 5);
             var testing = l.Skip(4 * l.Count / 5);
 
@@ -74,15 +74,11 @@ namespace MNIST
 
             // set up data arrays
             var training_data = training.Select(v => v.Image.ExtractCHW()).ToArray();
-            var training_labels = training.Select(v => 0f).ToArray();
+            var training_labels = training.Select(v => v.ToOutput(C:1)).ToArray();
             var testing_data = testing.Select(v => v.Image.ExtractCHW()).ToArray();
-            var testing_labels = testing.Select(v => 0f).ToArray();
+            var testing_labels = testing.Select(v => v.ToOutput(C:1)).ToArray();
 
-            //input
-            var features = Variable.InputVariable(new int[] { }, DataType.Float, "features");
-            var labels = Variable.InputVariable(new int[] { }, DataType.Float, "labels");
-
-            var network = BuildYoloDNN(C: 1);
+            var (network, features, labels) = BuildYoloDNN(C: 1);
 
             Console.WriteLine("Model architecture:");
             Console.WriteLine(network.ToSummary());
@@ -106,6 +102,10 @@ namespace MNIST
 
             for (int epoch = 0; epoch < maxEpochs; epoch++)
             {
+                var learner = CNTKLib.MomentumSGDLearner(
+                new ParameterVector((ICollection)network.Parameters()),
+                new TrainingParameterScheduleDouble(GetLearningRate(epoch)),
+                new TrainingParameterScheduleDouble(0.9));
                 // train one epoch on batches
                 loss[epoch] = 0.0;
                 trainingError[epoch] = 0.0;
@@ -115,11 +115,6 @@ namespace MNIST
                     // get the current batch
                     var featureBatch = features.GetBatch(training_data, indices, begin, end);
                     var labelBatch = labels.GetBatch(training_labels, indices, begin, end);
-
-                    var learner = CNTKLib.MomentumSGDLearner(
-                    new ParameterVector((ICollection)network.Parameters()),
-                    new TrainingParameterScheduleDouble(GetLearningRate(epoch)),
-                    new TrainingParameterScheduleDouble(0.9));
 
                     var trainer = network.GetTrainer(learner, lossFunc, errorFunc);
                     // train the network on the batch
@@ -169,31 +164,7 @@ namespace MNIST
             Console.WriteLine($"Final test error: {finalError:0.00}");
             Console.WriteLine($"Final test accuracy: {1 - finalError:0.00}");
 
-            // plot the error graph
-            var chart = Chart.Plot(
-                new[]
-                {
-                    new Graph.Scatter()
-                    {
-                        x = Enumerable.Range(0, maxEpochs).ToArray(),
-                        y = trainingError,
-                        name = "training",
-                        mode = "lines+markers"
-                    },
-                    new Graph.Scatter()
-                    {
-                        x = Enumerable.Range(0, maxEpochs).ToArray(),
-                        y = testingError,
-                        name = "testing",
-                        mode = "lines+markers"
-                    }
-                });
-            chart.WithXTitle("Epoch");
-            chart.WithYTitle("Classification error");
-            chart.WithTitle("Digit Training");
-
-            // save chart
-            File.WriteAllText("chart.html", chart.GetHtml());
+            network.Save("MODEL.MODEL");
         }
 
         private static double GetLearningRate(int epoch)
