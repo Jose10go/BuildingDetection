@@ -232,14 +232,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.Times(E, input);
         }
 
-        public static CNTK.Variable LSTM(
-            this CNTK.Variable input,
-            int lstmDimensions,
-            int cellDimensions)
-        {
-            return LSTMSequenceClassifier.LSTM(input, lstmDimensions, cellDimensions, NetUtil.CurrentDevice, "lstm");
-        }
-
         public static CNTK.Variable MultiplyBy<T>(
             this CNTK.Variable input,
             T scalar)
