@@ -255,20 +255,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.Reshape(input, newShape);
         }
 
-        public static CNTK.Variable VGG16(
-            this CNTK.Variable input, 
-            bool allowBlock5Finetuning)
-        {
-            return DataUtil.VGG16.GetModel(input, allowBlock5Finetuning);
-        }
-
-        public static CNTK.Variable VGG19(
-            this CNTK.Variable input,
-            bool freeze)
-        {
-            return DataUtil.VGG19.GetModel(input, freeze);
-        }
-
         public static CNTK.Function ToNetwork(
             this CNTK.Variable input)
         {
@@ -301,12 +287,6 @@ namespace CNTKUtil
             return sb.ToString();
         }
 
-        /// <summary>
-        /// The classification error function for binary classifiers.
-        /// </summary>
-        /// <param name="prediction">The prediction variable</param>
-        /// <param name="labels">The label variable</param>
-        /// <returns></returns>
         public static CNTK.Function BinaryClassificationError(CNTK.Variable prediction, CNTK.Variable labels)
         {
             var round_predictions = CNTK.CNTKLib.Round(prediction);
@@ -315,12 +295,6 @@ namespace CNTKUtil
             return result;
         }
 
-        /// <summary>
-        /// The mean squared error loss function for linear models.
-        /// </summary>
-        /// <param name="prediction">The prediction variable</param>
-        /// <param name="labels">The label variable</param>
-        /// <returns></returns>
         public static CNTK.Function MeanSquaredError(CNTK.Variable prediction, CNTK.Variable labels)
         {
             var squared_errors = CNTK.CNTKLib.Square(CNTK.CNTKLib.Minus(prediction, labels));
@@ -328,12 +302,6 @@ namespace CNTKUtil
             return result;
         }
 
-        /// <summary>
-        /// The mean absolute error loss function for linear models.
-        /// </summary>
-        /// <param name="prediction">The prediction variable</param>
-        /// <param name="labels">The label variable</param>
-        /// <returns></returns>
         public static CNTK.Function MeanAbsoluteError(CNTK.Variable prediction, CNTK.Variable labels)
         {
             var absolute_errors = CNTK.CNTKLib.Abs(CNTK.CNTKLib.Minus(prediction, labels));
