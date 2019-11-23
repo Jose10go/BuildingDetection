@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace CNTKUtil
@@ -62,7 +63,7 @@ namespace CNTKUtil
             Func<CNTK.Variable, CNTK.Function> activation,
             string outputName = "")
         {
-            return activation(Dense(input, outputDim, outputName));
+            return activation(Dense(input, outputDim,outputName));
         }
 
         public static CNTK.Variable Dense(
@@ -70,41 +71,47 @@ namespace CNTKUtil
             int[] outputDim,
             string outputName = "")
         {
-            var shape = CNTK.NDShape.CreateNDShape(outputDim);
+            var shape = CNTK.NDShape.CreateNDShape(outputDim.ToList().Append(CNTK.NDShape.InferredDimension));
             var timesParam = new CNTK.Parameter(
-                shape, 
-                CNTK.DataType.Float, 
+                shape,
+                CNTK.DataType.Float,
                 CNTK.CNTKLib.GlorotUniformInitializer(
-                    CNTK.CNTKLib.DefaultParamInitScale, 
-                    CNTK.CNTKLib.SentinelValueForInferParamInitRank, 
-                    CNTK.CNTKLib.SentinelValueForInferParamInitRank, 1), 
-                CurrentDevice, 
+                    CNTK.CNTKLib.DefaultParamInitScale,
+                    CNTK.CNTKLib.SentinelValueForInferParamInitRank,
+                    CNTK.CNTKLib.SentinelValueForInferParamInitRank, 1),
+                CurrentDevice,
                 "timesParam_" + outputName);
-
-            var timesFunction = CNTK.CNTKLib.Times(
-                timesParam, 
-                input);
-
+            var timesFunction = CNTK.CNTKLib.Times(timesParam,input,(uint)outputDim.Length,0);
             var plusParam = new CNTK.Parameter(
                 CNTK.NDShape.CreateNDShape(new int[] { CNTK.NDShape.InferredDimension }),
-                0.0f, 
-                CurrentDevice, 
+                0.0f,
+                CurrentDevice,
                 "plusParam_" + outputName);
             var result = CNTK.CNTKLib.Plus(plusParam, timesFunction, outputName);
             return result;
         }
 
-       
-        public static CNTK.Variable Convolution(
-            this CNTK.Variable input,
-            int[] filterShape,
-            bool padding = false,
-            bool bias = true,
-            int[] strides = null,
-            Func<CNTK.Variable, CNTK.Function> activation = null,
-            string outputName = "")
+        public static CNTK.Variable Convolution2D(
+             this CNTK.Variable input,
+             int outputChannels,
+             int[] filterShape,
+             bool padding = true,
+             bool bias = true,
+             int[] strides = null,
+             Func<CNTK.Variable, CNTK.Function> activation = null,
+             string outputName = "")
         {
-            return Convolution(filterShape, input, padding, bias, strides, activation, outputName);
+            var convolution_map_size = new int[] {
+                filterShape[0],
+                filterShape[1],
+                CNTK.NDShape.InferredDimension,
+                outputChannels
+            };
+            if (strides == null)
+            {
+                strides = new int[] { 1 };
+            }
+            return Convolution(convolution_map_size, input, padding, bias, strides, activation, outputName);
         }
 
         static public CNTK.Variable ConvolutionTranspose(
@@ -183,7 +190,7 @@ namespace CNTKUtil
             int[] windowShape,
             int[] strides)
         {
-            return CNTK.CNTKLib.Pooling(input, poolingType, windowShape, strides);
+            return CNTK.CNTKLib.Pooling(input, poolingType, windowShape, strides,new[] {true});
         }
 
         public static CNTK.Variable Pooling(
@@ -546,21 +553,6 @@ namespace CNTKUtil
                 CurrentDevice);
         }
 
-        // *******************************************************************
-        // Private utility functions
-        // *******************************************************************
-
-        /// <summary>
-        /// Helper method to add a convolution layer to a neural network.
-        /// </summary>
-        /// <param name="convolutionMapSize"></param>
-        /// <param name="input">The neural network to expand.</param>
-        /// <param name="padding">Use padding or not?</param>
-        /// <param name="bias">Use bias or not?</param>
-        /// <param name="strides">The stride lengths</param>
-        /// <param name="activation">The activation function to use</param>
-        /// <param name="outputName">The name of the layer.</param>
-        /// <returns></returns>
         private static CNTK.Function Convolution(
           int[] convolutionMapSize,
           CNTK.Variable input,
