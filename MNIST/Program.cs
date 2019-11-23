@@ -13,50 +13,50 @@ namespace MNIST
 {
     class Program
     {
-
-        public static Function BuildYoloDNN(int S = 7, int B = 2, int C = 20, int H = 416, int W = 448)
+        public static Function BuildYoloDNN(int S=7,int B=2,int C=20,int H=448,int W=448) 
         {
             //input
-            var features = Variable.InputVariable(new int[] { 3, H, W }, DataType.Float, "features");
-            var labels = Variable.InputVariable(new int[] { S, S, B * 5 + C }, DataType.Float, "labels");
+            var features = Variable.InputVariable(new int[] { H, W, 3 }, DataType.Float, "features");
+            //var labels = Variable.InputVariable(new int[] { S,S,B*5+C }, DataType.Float, "labels");
 
             //buildNetwork alo LINQ
             Func<Variable, Function> leakyRelu = (Variable v) => CNTKLib.LeakyReLU(v, 0.1);
-            var network = features.Convolution(new[] { 7, 7, 64 }, strides: new[] { 2 }, activation: leakyRelu)
+
+            var network = features.Convolution2D(64, new[] { 7, 7 }, strides: new[] { 2 }, activation: leakyRelu)
                                   .Pooling(PoolingType.Max, new[] { 2, 2 }, new[] { 2 })
-                                  .Convolution(new[] { 3, 3, 192 }, activation: leakyRelu)
+                                  .Convolution2D(192, new[] { 3, 3 }, activation: leakyRelu)
                                   .Pooling(PoolingType.Max, new[] { 2, 2 }, new[] { 2 })
-                                  .Convolution(new[] { 1, 1, 128 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 256 }, activation: leakyRelu)
-                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
+                                  .Convolution2D(128, new[] { 1, 1 }, activation: leakyRelu)
+                                  .Convolution2D(256, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Convolution2D(256, new[] { 1, 1 }, activation: leakyRelu)
+                                  .Convolution2D(512, new[] { 3, 3 }, activation: leakyRelu)
                                   .Pooling(PoolingType.Max, new[] { 2, 2 }, new[] { 2 })
-                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
-                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
-                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
-                                  .Convolution(new[] { 1, 1, 256 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 512 }, activation: leakyRelu)
-                                  .Convolution(new[] { 1, 1, 512 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
+                                  .Convolution2D(256, new[] { 1, 1 }, activation: leakyRelu)
+                                  .Convolution2D(512, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Convolution2D(256, new[] { 1, 1 }, activation: leakyRelu)
+                                  .Convolution2D(512, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Convolution2D(256, new[] { 1, 1 }, activation: leakyRelu)
+                                  .Convolution2D(512, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Convolution2D(256, new[] { 1, 1 }, activation: leakyRelu)
+                                  .Convolution2D(512, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Convolution2D(512, new[] { 1, 1 }, activation: leakyRelu)
+                                  .Convolution2D(1024, new[] { 3, 3 }, activation: leakyRelu)
                                   .Pooling(PoolingType.Max, new[] { 2, 2 }, new[] { 2 })
-                                  .Convolution(new[] { 1, 1, 512 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
-                                  .Convolution(new[] { 1, 1, 512 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 1024 }, strides: new[] { 2 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
-                                  .Convolution(new[] { 3, 3, 1024 }, activation: leakyRelu)
-                                  .Dense(new[] { 4096 }, activation: leakyRelu)
-                                  .Dense(new[] { S, S, B * 5 + C })
+                                  .Convolution2D(512, new[] { 1, 1 }, activation: leakyRelu)
+                                  .Convolution2D(1024, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Convolution2D(512, new[] { 1, 1 }, activation: leakyRelu)
+                                  .Convolution2D(1024, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Convolution2D(1024, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Convolution2D(1024, new[] { 3, 3 }, strides: new[] { 2 }, activation: leakyRelu)
+                                  .Convolution2D(1024, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Convolution2D(1024, new[] { 3, 3 }, activation: leakyRelu)
+                                  .Dense(new[] {4096}, activation: leakyRelu)
+                                  .Dense(new[] {S,S,B*5+C})
                                   .ToNetwork();
 
             return network;
         }
-
+       
         static void Main(string[] args)
         {
             // create a machine learning context

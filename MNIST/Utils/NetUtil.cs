@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace CNTKUtil
@@ -62,7 +63,7 @@ namespace CNTKUtil
             Func<CNTK.Variable, CNTK.Function> activation,
             string outputName = "")
         {
-            return activation(Dense(input, outputDim, outputName));
+            return activation(Dense(input, outputDim,outputName));
         }
 
         public static CNTK.Variable Dense(
@@ -70,41 +71,47 @@ namespace CNTKUtil
             int[] outputDim,
             string outputName = "")
         {
-            var shape = CNTK.NDShape.CreateNDShape(outputDim);
+            var shape = CNTK.NDShape.CreateNDShape(outputDim.ToList().Append(CNTK.NDShape.InferredDimension));
             var timesParam = new CNTK.Parameter(
-                shape, 
-                CNTK.DataType.Float, 
+                shape,
+                CNTK.DataType.Float,
                 CNTK.CNTKLib.GlorotUniformInitializer(
-                    CNTK.CNTKLib.DefaultParamInitScale, 
-                    CNTK.CNTKLib.SentinelValueForInferParamInitRank, 
-                    CNTK.CNTKLib.SentinelValueForInferParamInitRank, 1), 
-                CurrentDevice, 
+                    CNTK.CNTKLib.DefaultParamInitScale,
+                    CNTK.CNTKLib.SentinelValueForInferParamInitRank,
+                    CNTK.CNTKLib.SentinelValueForInferParamInitRank, 1),
+                CurrentDevice,
                 "timesParam_" + outputName);
-
-            var timesFunction = CNTK.CNTKLib.Times(
-                timesParam, 
-                input);
-
+            var timesFunction = CNTK.CNTKLib.Times(timesParam,input,(uint)outputDim.Length,0);
             var plusParam = new CNTK.Parameter(
                 CNTK.NDShape.CreateNDShape(new int[] { CNTK.NDShape.InferredDimension }),
-                0.0f, 
-                CurrentDevice, 
+                0.0f,
+                CurrentDevice,
                 "plusParam_" + outputName);
             var result = CNTK.CNTKLib.Plus(plusParam, timesFunction, outputName);
             return result;
         }
 
-       
-        public static CNTK.Variable Convolution(
-            this CNTK.Variable input,
-            int[] filterShape,
-            bool padding = false,
-            bool bias = true,
-            int[] strides = null,
-            Func<CNTK.Variable, CNTK.Function> activation = null,
-            string outputName = "")
+        public static CNTK.Variable Convolution2D(
+             this CNTK.Variable input,
+             int outputChannels,
+             int[] filterShape,
+             bool padding = true,
+             bool bias = true,
+             int[] strides = null,
+             Func<CNTK.Variable, CNTK.Function> activation = null,
+             string outputName = "")
         {
-            return Convolution(filterShape, input, padding, bias, strides, activation, outputName);
+            var convolution_map_size = new int[] {
+                filterShape[0],
+                filterShape[1],
+                CNTK.NDShape.InferredDimension,
+                outputChannels
+            };
+            if (strides == null)
+            {
+                strides = new int[] { 1 };
+            }
+            return Convolution(convolution_map_size, input, padding, bias, strides, activation, outputName);
         }
 
         static public CNTK.Variable ConvolutionTranspose(
@@ -183,7 +190,7 @@ namespace CNTKUtil
             int[] windowShape,
             int[] strides)
         {
-            return CNTK.CNTKLib.Pooling(input, poolingType, windowShape, strides);
+            return CNTK.CNTKLib.Pooling(input, poolingType, windowShape, strides,new[] {true});
         }
 
         public static CNTK.Variable Pooling(
@@ -225,14 +232,6 @@ namespace CNTKUtil
             return CNTK.CNTKLib.Times(E, input);
         }
 
-        public static CNTK.Variable LSTM(
-            this CNTK.Variable input,
-            int lstmDimensions,
-            int cellDimensions)
-        {
-            return LSTMSequenceClassifier.LSTM(input, lstmDimensions, cellDimensions, NetUtil.CurrentDevice, "lstm");
-        }
-
         public static CNTK.Variable MultiplyBy<T>(
             this CNTK.Variable input,
             T scalar)
@@ -246,20 +245,6 @@ namespace CNTKUtil
             CNTK.NDShape newShape)
         {
             return CNTK.CNTKLib.Reshape(input, newShape);
-        }
-
-        public static CNTK.Variable VGG16(
-            this CNTK.Variable input, 
-            bool allowBlock5Finetuning)
-        {
-            return DataUtil.VGG16.GetModel(input, allowBlock5Finetuning);
-        }
-
-        public static CNTK.Variable VGG19(
-            this CNTK.Variable input,
-            bool freeze)
-        {
-            return DataUtil.VGG19.GetModel(input, freeze);
         }
 
         public static CNTK.Function ToNetwork(
@@ -294,12 +279,6 @@ namespace CNTKUtil
             return sb.ToString();
         }
 
-        /// <summary>
-        /// The classification error function for binary classifiers.
-        /// </summary>
-        /// <param name="prediction">The prediction variable</param>
-        /// <param name="labels">The label variable</param>
-        /// <returns></returns>
         public static CNTK.Function BinaryClassificationError(CNTK.Variable prediction, CNTK.Variable labels)
         {
             var round_predictions = CNTK.CNTKLib.Round(prediction);
@@ -308,12 +287,6 @@ namespace CNTKUtil
             return result;
         }
 
-        /// <summary>
-        /// The mean squared error loss function for linear models.
-        /// </summary>
-        /// <param name="prediction">The prediction variable</param>
-        /// <param name="labels">The label variable</param>
-        /// <returns></returns>
         public static CNTK.Function MeanSquaredError(CNTK.Variable prediction, CNTK.Variable labels)
         {
             var squared_errors = CNTK.CNTKLib.Square(CNTK.CNTKLib.Minus(prediction, labels));
@@ -321,12 +294,6 @@ namespace CNTKUtil
             return result;
         }
 
-        /// <summary>
-        /// The mean absolute error loss function for linear models.
-        /// </summary>
-        /// <param name="prediction">The prediction variable</param>
-        /// <param name="labels">The label variable</param>
-        /// <returns></returns>
         public static CNTK.Function MeanAbsoluteError(CNTK.Variable prediction, CNTK.Variable labels)
         {
             var absolute_errors = CNTK.CNTKLib.Abs(CNTK.CNTKLib.Minus(prediction, labels));
@@ -546,21 +513,6 @@ namespace CNTKUtil
                 CurrentDevice);
         }
 
-        // *******************************************************************
-        // Private utility functions
-        // *******************************************************************
-
-        /// <summary>
-        /// Helper method to add a convolution layer to a neural network.
-        /// </summary>
-        /// <param name="convolutionMapSize"></param>
-        /// <param name="input">The neural network to expand.</param>
-        /// <param name="padding">Use padding or not?</param>
-        /// <param name="bias">Use bias or not?</param>
-        /// <param name="strides">The stride lengths</param>
-        /// <param name="activation">The activation function to use</param>
-        /// <param name="outputName">The name of the layer.</param>
-        /// <returns></returns>
         private static CNTK.Function Convolution(
           int[] convolutionMapSize,
           CNTK.Variable input,
