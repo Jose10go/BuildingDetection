@@ -290,14 +290,14 @@ namespace CNTKUtil
         public static CNTK.Function MeanSquaredError(CNTK.Variable prediction, CNTK.Variable labels)
         {
             var squared_errors = CNTK.CNTKLib.Square(CNTK.CNTKLib.Minus(prediction, labels));
-            var result = CNTK.CNTKLib.ReduceMean(squared_errors, new CNTK.Axis(0)); // TODO -- allStaticAxes?
+            var result = CNTK.CNTKLib.ReduceMean(squared_errors,CNTK.Axis.AllStaticAxes()); // TODO -- allStaticAxes?
             return result;
         }
 
         public static CNTK.Function MeanAbsoluteError(CNTK.Variable prediction, CNTK.Variable labels)
         {
             var absolute_errors = CNTK.CNTKLib.Abs(CNTK.CNTKLib.Minus(prediction, labels));
-            var result = CNTK.CNTKLib.ReduceMean(absolute_errors, new CNTK.Axis(0)); // TODO -- allStaticAxes? 
+            var result = CNTK.CNTKLib.ReduceMean(absolute_errors, CNTK.Axis.AllStaticAxes()); // TODO -- allStaticAxes? 
             return result;
         }
 
