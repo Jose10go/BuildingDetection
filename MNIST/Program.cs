@@ -1,4 +1,5 @@
-﻿using CNTK;
+﻿using BuildingDetection.Yolo;
+using CNTK;
 using CNTKUtil;
 using MNIST.Utils;
 using System;
@@ -14,19 +15,41 @@ namespace MNIST
 
         static void Main(string[] args)
         {
+            //BuildAndTrainYOLO();
+            //TestDrawer();
+            DrawLearningCurve();
+        }
+
+        private static void DrawLearningCurve()
+        {
+            
+        }
+
+        static void TestDrawer()
+        {
+            var (training, _ ) = LoadData();
+            foreach (AnnotationImage item in training)
+            {
+                var path = Path.GetDirectoryName(item.FileName);
+                var outpath = Path.Combine(path, "out");
+                var file = Path.GetFileName(item.FileName);
+                YoloBoundingBox.DrawBoundingBox(path, outpath, file, item.Object);
+            }
+        }
+
+        static void BuildAndTrainYOLO() 
+        {
             var (training, testing) = LoadData();
 
             //build network
             var network = BuildYoloDNN();
-            //var (network,_,_) = LoadModel(@"C:\Users\Jose10go\Downloads\tiny_yolov2\Model.onnx", ModelFormat.ONNX);
             Console.WriteLine("Model architecture:");
             Console.WriteLine(network.ToSummary());
 
             // set up the loss function and the error function
             var lossFunc = network.GetYoloLossFunction();
             var errorFunc = network.GetYoloErrorFunction();
-
-            Train(network,training,testing,lossFunc,errorFunc,"tinyyolo2",10,10);
+            Train(network, training, testing, lossFunc, errorFunc, "yolo", 10, 10);
         }
 
         static (IData[] training,IData[] testing) LoadData(double percent = 0.8) 
@@ -56,7 +79,6 @@ namespace MNIST
                 var learner = network.GetYoloLearner(epoch,maxEpochs);
                 var trainer = network.GetTrainer(learner, lossFunc, errorFunc);
                 var evaluator = network.GetEvaluator(errorFunc);
-
                 // train one epoch on batches
                 loss[epoch] = 0.0;
                 trainingError[epoch] = 0.0;
