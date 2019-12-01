@@ -1,4 +1,5 @@
-﻿using CNTKUtil;
+﻿using BuildingDetection.Yolo;
+using CNTKUtil;
 using MNIST.Utils;
 using System;
 using System.Collections.Generic;
@@ -11,7 +12,7 @@ namespace MNIST
     {
         public AnnotationImage()
         {
-            Object = new List<AnnotationObject>();
+            Object = new List<YoloBoundingBox>();
         }
         private Bitmap Image => new Bitmap(Bitmap.FromFile(FileName)).Resize(Width, Height);
 
@@ -22,7 +23,7 @@ namespace MNIST
         public int Height { get; private set; }
         public string FileName { get; private set; }
 
-        public List<AnnotationObject> Object { get; set; }
+        public List<YoloBoundingBox> Object { get; set; }
         public static AnnotationImage FromFile(string annotationImagePath, string imagePath, int width, int height)
         {
             var result = new AnnotationImage
@@ -36,13 +37,19 @@ namespace MNIST
             foreach (var line in lines)
             {
                 var elements = line.Split(' ');
-                result.Object.Add(new AnnotationObject
+                var classId = int.Parse(elements[0]);
+                result.Object.Add(new YoloBoundingBox
                 {
-                    ClassId = int.Parse(elements[0]),
-                    X = float.Parse(elements[1]),
-                    Y = float.Parse(elements[2]),
-                    W = float.Parse(elements[3]),
-                    H = float.Parse(elements[4]), 
+                    Dimensions = new BoundingBoxDimensions()
+                    {
+                        X = float.Parse(elements[1]),
+                        Y = float.Parse(elements[2]),
+                        Width = float.Parse(elements[3]),
+                        Height = float.Parse(elements[4]),
+                    },
+                    Confidence = 1,
+                    Label = YOLO.Tags[classId],
+                    BoxColor=YOLO.TagColors[classId]
                 });
             }
 
@@ -55,14 +62,14 @@ namespace MNIST
             var result = new float[S*S*(B * 5 + C)];
             foreach (var item in Object)
             {
-                var x = (int)(item.X * W);
-                var y =(int)(item.Y * H);
+                var x = (int)(item.Dimensions.X * W);
+                var y =(int)(item.Dimensions.Y * H);
                 var row =(int)( y * S/(float)H);
                 var column = (int)( x * S /(float)W);
-                result[row*S + column*S + 0] = item.X;
-                result[row*S + column*S + 1] = item.Y;
-                result[row*S + column*S + 2] = item.W;
-                result[row*S + column*S + 3] = item.H;
+                result[row*S + column*S + 0] = item.Dimensions.X;
+                result[row*S + column*S + 1] = item.Dimensions.Y;
+                result[row*S + column*S + 2] = item.Dimensions.Width;
+                result[row*S + column*S + 3] = item.Dimensions.Height;
                 result[row*S + column*S + 4] = 1;
                 result[row*S + column*S + 5] = 0;
                 result[row*S + column*S + 6] = 0;
@@ -75,16 +82,4 @@ namespace MNIST
         }
     }
 
-    public class AnnotationObject
-    {
-        public int ClassId { get; set; }
-
-        public float X { get; set; }
-
-        public float Y { get; set; }
-
-        public float W { get; set; }
-    
-        public float H { get; set; }
-    }
 }
