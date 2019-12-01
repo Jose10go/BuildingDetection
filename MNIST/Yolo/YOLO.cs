@@ -2,19 +2,23 @@
 using CNTKUtil;
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
 
 namespace BuildingDetection.Yolo
 {
     public static class YOLO
     {
+        public static string[] Tags = new string[] { "building" };
+        public static Color[] TagColors = new Color[] {Color.Red};
         public static int S = 7;
         public static int B = 2;
-        public static int C = 1; //20;
+        public static int C = Tags.Length;
         public static int H = 448;
         public static int W = 448;
         public static Variable features= Variable.InputVariable(new int[] { H, W, 3 }, DataType.Float, "features");
         public static Variable labels = Variable.InputVariable(new int[] { S, S, B * 5 + C }, DataType.Float, "labels");
-        
         public static Function BuildYoloDNN()
         {
             //buildNetwork alo LINQ
