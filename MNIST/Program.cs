@@ -1,7 +1,11 @@
-﻿using BuildingDetection.Yolo;
+﻿using BuildingDetection.LearningCurves;
+using BuildingDetection.Utils;
+using BuildingDetection.Yolo;
 using CNTK;
 using CNTKUtil;
 using MNIST.Utils;
+using OxyPlot;
+using OxyPlot.Series;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,12 +21,21 @@ namespace MNIST
         {
             //BuildAndTrainYOLO();
             //TestDrawer();
-            DrawLearningCurve();
+            //TestDrawLearningCurve();
+            //TestDrawLearningCurve2();
+        }
+        private static void TestDrawLearningCurve2()
+        {
+            LearningCurves.ExportSvgFromData("learning.json");
         }
 
-        private static void DrawLearningCurve()
+        private static void TestDrawLearningCurve()
         {
-            
+            List<double> training_error = new List<double> { 0.14, 0.14, 0.15, 0.16, 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 };
+            List<double> testing_error = new List<double> { 0.19, 0.19, 0.20, 0.20, 0.21, 0.21, 0.21, 0.21, 0.21, 0.21 };
+
+            var learn = new LearningCurves(training_error, testing_error);
+            learn.ExportSVG();
         }
 
         static void TestDrawer()
@@ -145,17 +158,22 @@ namespace MNIST
             File.WriteAllText($"{outputPath}/learning.json",Newtonsoft.Json.JsonConvert.SerializeObject(new {TrainingError=trainingError,TestingError=testingError}));
         }
         
-        private static (Function network, List<double> trainingError, List<double> testingError) LoadModel(string path,ModelFormat format)
+        private static (Function network, LearningCurvesData learningData) LoadModel(string path,ModelFormat format)
         {
-            var network=Function.Load($"{path}",DeviceDescriptor.CPUDevice,format);
-            var anonimous = new { TrainingError = new List<double>(), TestingError = new List<double>() };
+            var network=Function.Load(path,DeviceDescriptor.CPUDevice,format);
             var dirPath = Path.GetDirectoryName(path);
-            if (File.Exists($"{dirPath}/learning.json")) 
-            {
-                var str=File.ReadAllText($"{path}/learning.json");
-                anonimous=Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(str,anonimous);
-            }
-            return (network, anonimous.TrainingError, anonimous.TestingError);
+            var data = LearningCurvesData.LoadFrom(dirPath);
+            return (network,data);
+        }
+
+        private static Function CreateTransferLearningModel(string baseModelFile,string hiddenNodeName,ParameterCloningMethod parameterCloningMethod=ParameterCloningMethod.Freeze)
+        {
+            Function baseModel = Function.Load(baseModelFile, DeviceDescriptor.CPUDevice);
+            Function lastNode = baseModel.FindByName(hiddenNodeName);
+
+            // Clone the desired layers with fixed weights
+            Function clonedLayer = CNTKLib.AsComposite(lastNode).Clone(parameterCloningMethod);
+            return clonedLayer;
         }
     
     }
