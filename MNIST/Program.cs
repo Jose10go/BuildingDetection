@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using static BuildingDetection.Yolo.YOLO;
 
 namespace MNIST
@@ -19,7 +20,7 @@ namespace MNIST
 
         static void Main(string[] args)
         {
-            //BuildAndTrainYOLO();
+            BuildAndTrainYOLO();
             //TestDrawer();
             //TestDrawLearningCurve();
             //TestDrawLearningCurve2();
@@ -62,7 +63,7 @@ namespace MNIST
             // set up the loss function and the error function
             var lossFunc = network.GetYoloLossFunction();
             var errorFunc = network.GetYoloErrorFunction();
-            Train(network, training, testing, lossFunc, errorFunc, "yolo", 10, 10);
+            TrainMinibatchSource(network, training, testing, lossFunc, errorFunc, "yolo", 10, 10);
         }
 
         static (IData[] training,IData[] testing) LoadData(double percent = 0.8) 
@@ -175,6 +176,96 @@ namespace MNIST
             Function clonedLayer = CNTKLib.AsComposite(lastNode).Clone(parameterCloningMethod);
             return clonedLayer;
         }
-    
+
+        private static MinibatchSource CreateMinibatchSource(string image_map_file,string label_map_file)
+        {
+            List<CNTKDictionary> transforms = new List<CNTKDictionary>
+            {
+                CNTKLib.ReaderScale(W,H,3, "linear")
+            };
+            var ctfDeserializer = CNTKLib.CTFDeserializer(label_map_file, new StreamConfigurationVector() { new StreamConfiguration("boundingbox",S*S*(5*B+C))});
+            var imageDeserializer = CNTKLib.ImageDeserializer(image_map_file, "label", 1, "image", transforms);
+            MinibatchSourceConfig config = new MinibatchSourceConfig(new List<CNTKDictionary> { imageDeserializer, ctfDeserializer });
+
+            return CNTKLib.CreateCompositeMinibatchSource(config);
+        }
+
+        static void TrainMinibatchSource(Function network, IData[] training, IData[] testing, Function lossFunc, Function errorFunc, string outputPath, int maxEpochs/*135*/, int batchSize/*64*/, bool autoSave = true, int autoSaveStep = 2)
+        {
+            // train the model
+            Console.WriteLine("Epoch\tTrain\tTrain\tTest");
+            Console.WriteLine("\tLoss\tError\tError");
+            Console.WriteLine("-----------------------------");
+
+            var loss = Enumerable.Repeat(0d,maxEpochs).ToList();
+            var trainingError = Enumerable.Repeat(0d,maxEpochs).ToList();
+            var testingError = Enumerable.Repeat(0d,maxEpochs).ToList();
+            var (imageMap, dataMap) = CreateMapFiles(training);
+
+            for (int epoch = 0; epoch < maxEpochs; epoch++)
+            {
+                var learner = network.GetYoloLearner(epoch, maxEpochs);
+                var trainer = network.GetTrainer(learner, lossFunc, errorFunc);
+                var evaluator = network.GetEvaluator(errorFunc);
+                
+                var source = CreateMinibatchSource(imageMap, dataMap);
+                var featureStreamInfo = source.StreamInfo("image");
+                var labelStreamInfo = source.StreamInfo("boundingbox");
+                int batchCant = 10;
+                for (int batchCount = 0; batchCount < batchCant; batchCount++)
+                {
+                    var batch = source.GetNextMinibatch((uint)batchSize,DeviceDescriptor.CPUDevice);
+                    // train the network on the batch
+                    var result = trainer.TrainMinibatch(new Dictionary<Variable, MinibatchData>() {
+                                                                { features, batch[featureStreamInfo]},
+                                                                { labels, batch[labelStreamInfo]}},
+                                                                DeviceDescriptor.CPUDevice);
+
+                    loss[epoch] += trainer.PreviousMinibatchLossAverage();
+                    trainingError[epoch] += trainer.PreviousMinibatchEvaluationAverage();
+                }
+                // show results
+                loss[epoch] /= batchCant;
+                trainingError[epoch] /= batchCant;
+                Console.Write($"{epoch}\t{loss[epoch]:F3}\t{trainingError[epoch]:F3}\t");
+
+                for (int batchCount = 0; batchCount < batchCant; batchCount++)
+                {
+                    var batch = source.GetNextMinibatch((uint)batchSize, DeviceDescriptor.CPUDevice);
+                    // test the network on the batch
+                    testingError[epoch] += evaluator.TestMinibatch(new UnorderedMapVariableMinibatchData() {
+                                                                    { features, batch[featureStreamInfo]},
+                                                                    { labels, batch[labelStreamInfo]}},
+                                                                    DeviceDescriptor.CPUDevice); ;
+                }
+                testingError[epoch] /= batchCant;
+                Console.WriteLine($"{testingError[epoch]:F3}");
+                if (epoch % autoSaveStep == 0)
+                    SaveModel(network, trainingError, testingError, outputPath);
+            }
+
+            // show final results
+            var finalError = testingError.Last();
+            Console.WriteLine();
+            Console.WriteLine($"Final test error: {finalError:0.00}");
+            Console.WriteLine($"Final test accuracy: {1 - finalError:0.00}");
+            SaveModel(network, trainingError, testingError, outputPath);
+        }
+
+        private static (string imagemap,string labelmap) CreateMapFiles(IData[] data)
+        {
+            string imagemap = "imagesmap.txt";
+            string labelmap = "labelsmap.txt";
+            StringBuilder images = new StringBuilder();
+            StringBuilder labels = new StringBuilder();
+            foreach (var item in data)
+            {
+                images.AppendLine(item.Reference+"\t 0");
+                labels.AppendLine("|boundingbox "+ string.Join(' ',item.Labels));
+            }
+            File.WriteAllText(imagemap,images.ToString());
+            File.WriteAllText(labelmap,labels.ToString());
+            return (imagemap, labelmap);
+        }
     }
 }
