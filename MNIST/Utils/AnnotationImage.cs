@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-
+using static BuildingDetection.Yolo.YOLO;
 namespace MNIST
 {
     public class AnnotationImage:IData
@@ -14,7 +14,7 @@ namespace MNIST
         {
             Object = new List<YoloBoundingBox>();
         }
-        private Bitmap Image => new Bitmap(Bitmap.FromFile(FileName)).Resize(Width, Height);
+        private Bitmap Image => new Bitmap(Bitmap.FromFile(FileName)).Resize(W,H);
 
         public float[] Features => Image.ExtractCHW();
         public float[] Labels => ToOutput(C: 1);
