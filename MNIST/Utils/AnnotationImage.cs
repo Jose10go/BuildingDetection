@@ -17,7 +17,8 @@ namespace MNIST
         private Bitmap Image => new Bitmap(Bitmap.FromFile(FileName)).Resize(Width, Height);
 
         public float[] Features => Image.ExtractCHW();
-        public float[] Labels => ToOutput(C: 1); 
+        public float[] Labels => ToOutput(C: 1);
+        public string Reference => FileName;
 
         public int Width { get; private set; }
         public int Height { get; private set; }
