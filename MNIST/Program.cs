@@ -20,11 +20,32 @@ namespace MNIST
 
         static void Main(string[] args)
         {
-            BuildAndTrainYOLO();
+            //BuildAndTrainYOLO();
             //TestDrawer();
             //TestDrawLearningCurve();
             //TestDrawLearningCurve2();
+            EvaluateModel();
         }
+
+        private static void EvaluateModel()
+        {
+            var (network,_) = LoadModel("model9.model",ModelFormat.CNTKv2);
+            var (evaluationData, _) = LoadData();
+            foreach (var item in evaluationData)
+            {
+                var inputs = new Dictionary<Variable, Value>();
+                inputs.Add(network.Arguments.First(),new Value(new NDArrayView(new NDShape(new SizeTVector() {(uint)W,(uint)H,3}),item.Features,DeviceDescriptor.CPUDevice)));
+                var outputs = new Dictionary<Variable, Value>() { {network.Output,null} };
+                network.Evaluate(inputs,outputs,DeviceDescriptor.CPUDevice);
+                var boundingboxes = YOLOOutputParser.ParseOutputs(outputs[network.Output].GetDenseData<float>(network.Output)[0].ToArray());
+                boundingboxes = YOLOOutputParser.FilterBoundingBoxes(boundingboxes, 3, 0.1f);
+                var dir = Path.GetDirectoryName(item.Reference);
+                var imgname = Path.GetFileName(item.Reference);
+                YoloBoundingBox.DrawBoundingBox(dir, Path.Combine(dir, "out"), imgname, boundingboxes);
+            }
+
+        }
+
         private static void TestDrawLearningCurve2()
         {
             LearningCurves.ExportSvgFromData("learning.json");
