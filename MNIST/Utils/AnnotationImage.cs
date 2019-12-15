@@ -17,7 +17,7 @@ namespace MNIST
         private Bitmap Image => new Bitmap(Bitmap.FromFile(FileName)).Resize(W,H);
 
         public float[] Features => Image.ExtractCHW();
-        public float[] Labels => ToOutput(C: 1);
+        public float[] Labels => ToOutput();
         public string Reference => FileName;
 
         public int Width { get; private set; }
@@ -49,15 +49,15 @@ namespace MNIST
                         Height = float.Parse(elements[4]),
                     },
                     Confidence = 1,
-                    Label = YOLO.Tags[classId],
-                    BoxColor=YOLO.TagColors[classId]
+                    Label = Tags[classId],
+                    BoxColor=TagColors[classId]
                 });
             }
 
             return result;
         }
 
-        private float[] ToOutput(int S = 7, int B = 2, int C = 20, int H = 448, int W = 448) 
+        private float[] ToOutput() 
         {
             //TODO: Improve THIS
             var result = new float[S*S*(B * 5 + C)];
