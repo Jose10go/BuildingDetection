@@ -39,9 +39,6 @@ namespace BuildingDetection.TinyYoloV2
                                         .TransposeAxes(new Axis(2), new Axis(1))
                                         .TransposeAxes(new Axis(1), new Axis(0));
             var n = transpose.Convolution(new[] { 1, 1, 1, 1024, B * (5 + C) }, true, false, new int[] { 1, 1, 1, 1024 });
-            Console.WriteLine(n.ToSummary());
-
-            n.Save("tl101.model");
             return new TinyYOLOV2(network, new LearningCurvesData());
         }
 

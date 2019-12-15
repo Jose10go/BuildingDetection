@@ -513,9 +513,9 @@ namespace CNTKUtil
                 CurrentDevice);
         }
 
-        private static CNTK.Function Convolution(
+        public static CNTK.Function Convolution(
+          this CNTK.Variable input,
           int[] convolutionMapSize,
-          CNTK.Variable input,
           bool padding,
           bool bias,
           int[] strides,
