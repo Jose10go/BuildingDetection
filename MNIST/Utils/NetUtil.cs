@@ -111,7 +111,7 @@ namespace CNTKUtil
             {
                 strides = new int[] { 1 };
             }
-            return Convolution(convolution_map_size, input, padding, bias, strides, activation, outputName);
+            return Convolution(input,convolution_map_size, padding, bias, strides, activation, outputName);
         }
 
         static public CNTK.Variable ConvolutionTranspose(
