@@ -4,6 +4,5 @@
     {
         string Reference { get; }
         float[] Features { get; }
-        float[] Labels { get; }
     }
 }
