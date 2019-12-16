@@ -9,6 +9,9 @@ namespace BuildingDetection.Yolo
 {
     public class YoloBoundingBox
     {
+        public static string[] Tags = new[] { "building" };
+
+        public static Color[] TagColors = new[] { Color.Red };
         public BoundingBoxDimensions Dimensions { get; set; }
         public string Label { get; set; }
         public float Confidence { get; set; }

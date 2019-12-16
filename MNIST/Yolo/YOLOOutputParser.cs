@@ -99,8 +99,8 @@ namespace BuildingDetection.Yolo
                         {
                             Dimensions = boundingBoxDimensions,
                             Confidence = topScore,
-                            Label = Tags[topResultIndex],
-                            BoxColor = TagColors[topResultIndex]
+                            Label = YoloBoundingBox.Tags[topResultIndex],
+                            BoxColor = YoloBoundingBox.TagColors[topResultIndex]
                         });
                     }
                 }

@@ -1,6 +1,7 @@
 ﻿using BuildingDetection.LearningCurves;
 using CNTK;
 using CNTKUtil;
+using MNIST;
 using Newtonsoft.Json;
 using System;
 using System.Collections;
@@ -38,19 +39,22 @@ namespace BuildingDetection.Yolo
         
         public abstract Function GetErrorFunction(Variable truth, Variable prediction);
 
-        //public void Train(IData[] training, IData[] testing, Function lossFunc, Function errorFunc, string outputPath, int maxEpochs/*135*/, int batchSize/*64*/, bool autoSave = true, int autoSaveStep = 2)
+        //public void Train(IData[] training, IData[] testing, string outputPath, int maxEpochs/*135*/, int batchSize/*64*/, bool autoSave = true, int autoSaveStep = 2)
         //{
         //    // train the model
         //    Console.WriteLine("Epoch\tTrain\tTrain\tTest");
         //    Console.WriteLine("\tLoss\tError\tError");
         //    Console.WriteLine("-----------------------------");
 
-        //    Variable features = Variable.InputVariable(new int[] { (int)H, (int)W, 3 }, DataType.Float, "features");
-        //    Variable labels = Variable.InputVariable(new int[] { (int)S, (int)S, (int)B * 5 + (int)C }, DataType.Float, "labels");
+        //    Variable features = Network.Arguments[0];
+        //    Variable labels = Variable.InputVariable(Network.Output.Shape, DataType.Float, "labels");
 
-        //    var loss = new double[maxEpochs];
-        //    var trainingError = new List<double>(maxEpochs);
-        //    var testingError = new List<double>(maxEpochs);
+        //    Function lossFunc = GetLossFunction(labels, Network.Output);
+        //    Function errorFunc = GetErrorFunction(labels, Network.Output);
+
+        //    var loss = Enumerable.Repeat(0d, maxEpochs).ToList();
+        //    var trainingError = Enumerable.Repeat(0d, maxEpochs).ToList();
+        //    var testingError = Enumerable.Repeat(0d, maxEpochs).ToList();
 
         //    for (int epoch = 0; epoch < maxEpochs; epoch++)
         //    {
@@ -147,12 +151,14 @@ namespace BuildingDetection.Yolo
                 int batchCant = 0;
                 while (trainer.TotalNumberOfSamplesSeen() < training.Length) 
                 {
-                    var batch = source.GetNextMinibatch((uint)batchSize, DeviceDescriptor.GPUDevice(0));
+                    var batch = source.GetNextMinibatch((uint)batchSize, (uint)batchSize);
+                    var a1 = batch[featureStreamInfo];
+                    var a2 = batch[labelStreamInfo];
                     // train the network on the batch
                     var result = trainer.TrainMinibatch(new Dictionary<Variable, MinibatchData>() {
-                                                                { features, batch[featureStreamInfo]},
-                                                                { labels, batch[labelStreamInfo]}},
-                                                                DeviceDescriptor.GPUDevice(0));
+                                                                { features, a1},
+                                                                { labels, a2}},
+                                                                DeviceDescriptor.CPUDevice);
 
                     loss[epoch] += trainer.PreviousMinibatchLossAverage();
                     trainingError[epoch] += trainer.PreviousMinibatchEvaluationAverage();
@@ -175,7 +181,7 @@ namespace BuildingDetection.Yolo
                     testingError[epoch] += evaluator.TestMinibatch(new UnorderedMapVariableMinibatchData() {
                                                                     { features, batch[featureStreamInfo]},
                                                                     { labels, batch[labelStreamInfo]}},
-                                                                    DeviceDescriptor.GPUDevice(0));
+                                                                    DeviceDescriptor.CPUDevice);
                 }
                 testingError[epoch] /= batchCant;
                 Console.WriteLine($"{testingError[epoch]:F3}");
@@ -191,21 +197,7 @@ namespace BuildingDetection.Yolo
             SaveModel(outputPath);
         }
 
-        private static (string imagemap, string labelmap) CreateMapFiles(IData[] data)
-        {
-            string imagemap = "imagesmap.txt";
-            string labelmap = "labelsmap.txt";
-            StringBuilder images = new StringBuilder();
-            StringBuilder labels = new StringBuilder();
-            foreach (var item in data)
-            {
-                images.AppendLine(item.Reference + "\t 0");
-                labels.AppendLine("|boundingbox " + string.Join(' ', item.Labels));
-            }
-            File.WriteAllText(imagemap, images.ToString());
-            File.WriteAllText(labelmap, labels.ToString());
-            return (imagemap, labelmap);
-        }
+        protected abstract (string imagemap, string labelmap) CreateMapFiles(IData[] data);
 
         protected abstract MinibatchSource CreateMinibatchSource(params string[] map_file);
 
@@ -215,8 +207,6 @@ namespace BuildingDetection.Yolo
 
     public class YOLO:Model
     {
-        public static readonly string[] Tags=new [] {"building"};
-        public static Color[] TagColors=new[] {Color.Red};
         public static readonly int S =7;
         public static readonly int B =2;
         public static readonly int C =1;
@@ -440,6 +430,46 @@ namespace BuildingDetection.Yolo
             var dir = Path.GetDirectoryName(item.Reference);
             var imgname = Path.GetFileName(item.Reference);
             YoloBoundingBox.DrawBoundingBox(dir, Path.Combine(dir, "out"), imgname, boundingboxes);
+        }
+
+        protected override (string imagemap, string labelmap) CreateMapFiles(IData[] data)
+        {
+            string imagemap = $"imagesmapYolo.txt";
+            string labelmap = $"labelsmapYolo.txt";
+            StringBuilder images = new StringBuilder();
+            StringBuilder labels = new StringBuilder();
+            foreach (var item in data)
+            {
+                images.AppendLine(item.Reference + "\t 0");
+                labels.AppendLine("|boundingbox " + string.Join(' ', OutputFormat((AnnotationImage)item)));
+            }
+            File.WriteAllText(imagemap, images.ToString());
+            File.WriteAllText(labelmap, labels.ToString());
+            return (imagemap, labelmap);
+        }
+
+        private float[] OutputFormat(AnnotationImage annotationImage)
+        {
+            var result = new float[S * S * (B * (5 + C))];
+            foreach (var item in annotationImage.Object)
+            {
+                var x = (int)(item.Dimensions.X * annotationImage.Width);
+                var y = (int)(item.Dimensions.Y * annotationImage.Height);
+                var row = (int)(y * S / (float)annotationImage.Height);
+                var column = (int)(x * S / (float)annotationImage.Width);
+                result[row * S + column * S + 0] = item.Dimensions.X;
+                result[row * S + column * S + 1] = item.Dimensions.Y;
+                result[row * S + column * S + 2] = item.Dimensions.Width;
+                result[row * S + column * S + 3] = item.Dimensions.Height;
+                result[row * S + column * S + 4] = 1;
+                result[row * S + column * S + 5] = 0;
+                result[row * S + column * S + 6] = 0;
+                result[row * S + column * S + 7] = 0;
+                result[row * S + column * S + 8] = 0;
+                result[row * S + column * S + 9] = 0;
+                result[row * S + column * S + 10] = 0;
+            }
+            return result;
         }
     }
 
